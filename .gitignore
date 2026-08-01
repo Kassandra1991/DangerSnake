@@ -1,3 +1,4 @@
+# Unity
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
@@ -23,16 +24,32 @@ ExportedObj/
 *.mdb
 *.opendb
 *.VC.db
-*.pidb.meta
-*.pdb.meta
-*.mdb.meta
 sysinfo.txt
 *.apk
 *.aab
 *.app
 crashlytics-buildid.txt
 AssetStoreTools/
+
+# Xcode / Swift
+DerivedData/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+timeline.xctimeline
+playground.xcworkspace
+.build/
+.swiftpm/
+DangerSnake/.derivedData/
+
+# IDE / OS
 .idea/
 .vscode/
-*.DotSettings.user
 .DS_Store
+*.DotSettings.user

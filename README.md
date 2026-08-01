@@ -1,60 +1,43 @@
 # DangerSnake
 
-Authorial snake arcade: you chase the apple — the apple picks up **Shield**, **Bomb**, **Sword**, or **Boomerang** and can strike back.
+Native **SwiftUI** arcade (iPhone + iPad): **you are the apple**. An AI snake hunts you — grab **Shield**, **Bomb**, **Sword**, or **Boomerang** and fight back.
 
-## Stack
+## Open & run (primary)
 
-- **Unity** (C#) — one project → **WebGL** + **iOS**
-- Scenes: `Boot` → `Menu` → `Game`
-- Core scripts under `Assets/Scripts/`
+1. Install Xcode 16+ (iOS 17 SDK)
+2. Open [`DangerSnake/DangerSnake.xcodeproj`](DangerSnake/DangerSnake.xcodeproj)
+3. Select an iPhone or iPad simulator (or your device)
+4. Set your **Team** under Signing if running on device
+5. Press **Run**
 
-## Open in Unity
+Bundle ID: `com.dangersnake.game`  
+Deployment: **iOS 17.0+**, universal (`TARGETED_DEVICE_FAMILY = 1,2`)
 
-1. Install [Unity Hub](https://unity.com/download) + **Unity 6 LTS** (2D / built-in pipeline is enough)
-2. Add modules: **WebGL Build Support**, **iOS Build Support** (Mac)
-3. Hub → **Open** → this repository folder
-4. Press Play on `Assets/Scenes/Boot.unity` (or Menu / Game)
+### Controls
 
-Unity may refresh `ProjectSettings` and package versions on first open — that is expected.
+Swipe the board or use on-screen arrows to move **the apple**.
 
-## Controls
-
-| Platform | Input |
-|----------|--------|
-| Web / desktop | Arrow keys or WASD |
-| iPhone / iPad | Swipe |
-| Editor | Both |
-
-## Gameplay (v1)
-
-- Snake eats an **unarmed** apple → grow + score
-- Random items spawn on the field
-- Apple AI: **flee** / **seek item** / **attack** when armed
-- **Shield** (snake): blocks one bite
-- **Bomb**: cuts ~half the body
-- **Sword**: kill on contact
-- **Boomerang**: ranged cut of one segment along a grid line
-
-## Builds
-
-Menu bar after scripts compile:
-
-- **DangerSnake → Build → WebGL (itch.io)** → see [Docs/ITCH_IO.md](Docs/ITCH_IO.md)
-- **DangerSnake → Build → iOS (Xcode / TestFlight)** → see [Docs/IOS_TESTFLIGHT.md](Docs/IOS_TESTFLIGHT.md)
-
-## Project layout
+### Layout
 
 ```
-Assets/
-  Scenes/           Boot, Menu, Game
-  Scripts/
-    Bootstrap/      scene entry
-    Core/           grid, config
-    Gameplay/       snake, apple AI, items, session tick
-    Items/          effects + combat
-    Input/          IInput, keyboard, swipe, platform
-    UI/             board view + HUD
-  Editor/           build pipeline menu
-  Resources/        GameConfig
-Docs/               itch + TestFlight checklists
+DangerSnake/                 # Xcode app
+  DangerSnakeApp.swift
+  App/RootView.swift
+  Features/Menu|Game/        # SwiftUI screens + Canvas board
+  Core/                      # grid + config
+  Gameplay/                  # engine, player apple, snake AI, items
+  Items/                     # effects + combat
+  Input/                     # swipe gesture
+  Resources/                 # Assets + Info.plist
+Unity/                       # archived Unity WebGL/iOS prototype
 ```
+
+## Gameplay
+
+- You are the apple; the snake AI hunts you
+- Pick up **Shield** (blocks one bite), **Bomb** / **Sword** / **Boomerang** to damage the snake
+- Touch the snake while armed to strike; get eaten without a shield → Game Over
+
+## Unity (archived)
+
+The earlier Unity prototype lives under [`Unity/`](Unity/). See [`Unity/Docs/`](Unity/Docs/) for itch.io / TestFlight notes if you revive that path.
