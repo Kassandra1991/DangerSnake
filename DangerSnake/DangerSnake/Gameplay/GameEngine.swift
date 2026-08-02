@@ -20,6 +20,8 @@ final class GameEngine {
     private(set) var awaitingFirstInput = true
 
     private var tickTimer: TimeInterval = 0
+    private var snakeTickTimer: TimeInterval = 0
+    private var matchElapsed: TimeInterval = 0
     private var occupied = Set<GridPos>()
     private var displayLink: CADisplayLinkProxy?
 
@@ -48,6 +50,8 @@ final class GameEngine {
         items.reset()
 
         tickTimer = 0
+        snakeTickTimer = 0
+        matchElapsed = 0
         isRunning = true
         isGameOver = false
         isVictory = false
@@ -96,20 +100,29 @@ final class GameEngine {
         guard isRunning else { return }
         if awaitingFirstInput { return }
 
+        matchElapsed += dt
         rebuildOccupied()
         items.tickRealtime(dt: dt, grid: grid, occupied: occupied)
 
         tickTimer += dt
         while tickTimer >= config.tickInterval {
             tickTimer -= config.tickInterval
-            stepTick()
+            stepAppleTick()
+            if !isRunning { break }
+        }
+
+        let snakeInterval = config.snakeInterval(afterElapsed: matchElapsed)
+        snakeTickTimer += dt
+        while isRunning, snakeTickTimer >= snakeInterval {
+            snakeTickTimer -= snakeInterval
+            stepSnakeTick()
             if !isRunning { break }
         }
 
         renderTick &+= 1
     }
 
-    private func stepTick() {
+    private func stepAppleTick() {
         rebuildOccupied()
 
         // 1) Player apple moves.
@@ -154,7 +167,15 @@ final class GameEngine {
             }
         }
 
-        // 4) Snake AI hunts the apple.
+        // Contact if snake already sits on apple between snake ticks.
+        if snake.head == apple.position {
+            handleSnakeBite()
+        }
+    }
+
+    private func stepSnakeTick() {
+        rebuildOccupied()
+
         let chase = SnakeAI.chooseDirection(snake: snake, apple: apple.position, grid: grid)
         snake.setDirection(chase)
         if !snake.tickMove(grid: grid) {
@@ -162,7 +183,6 @@ final class GameEngine {
             return
         }
 
-        // 5) Snake bite / mutual contact.
         if snake.head == apple.position {
             handleSnakeBite()
         }

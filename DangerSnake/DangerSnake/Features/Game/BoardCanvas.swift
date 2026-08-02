@@ -36,8 +36,8 @@ struct BoardCanvas: View {
 
                 for item in engine.fieldItems {
                     let rect = cellRect(x: item.position.x, y: item.position.y, cell: cell, originX: originX, originY: originY, rows: engine.grid.height)
-                        .insetBy(dx: cell * 0.22, dy: cell * 0.22)
-                    context.fill(Path(roundedRect: rect, cornerRadius: 4), with: .color(color(for: item.type)))
+                        .insetBy(dx: cell * 0.14, dy: cell * 0.14)
+                    EntityShapes.drawItem(type: item.type, in: rect, context: &context)
                 }
 
                 let body = engine.snakeBody
@@ -115,14 +115,5 @@ struct BoardCanvas: View {
             width: cell,
             height: cell
         )
-    }
-
-    private func color(for type: ItemType) -> Color {
-        switch type {
-        case .shield: return Color(red: 0.35, green: 0.7, blue: 1.0)
-        case .bomb: return Color(red: 0.2, green: 0.2, blue: 0.22)
-        case .sword: return Color(red: 0.9, green: 0.85, blue: 0.35)
-        case .boomerang: return Color(red: 0.85, green: 0.45, blue: 0.2)
-        }
     }
 }

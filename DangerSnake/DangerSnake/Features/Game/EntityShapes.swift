@@ -240,4 +240,164 @@ enum EntityShapes {
             y: (a.y + b.y) * 0.5 - (b.x - a.x) * bulge
         )
     }
+
+    // MARK: - Items
+
+    static func drawItem(type: ItemType, in rect: CGRect, context: inout GraphicsContext) {
+        switch type {
+        case .shield: drawShield(in: rect, context: &context)
+        case .bomb: drawBomb(in: rect, context: &context)
+        case .sword: drawSword(in: rect, context: &context)
+        case .boomerang: drawBoomerang(in: rect, context: &context)
+        }
+    }
+
+    private static func drawShield(in rect: CGRect, context: inout GraphicsContext) {
+        let fill = Color(red: 0.35, green: 0.7, blue: 1.0)
+        let rim = Color(red: 0.15, green: 0.4, blue: 0.75)
+        let inset = rect.insetBy(dx: rect.width * 0.08, dy: rect.height * 0.08)
+
+        var shield = Path()
+        let top = CGPoint(x: inset.midX, y: inset.minY)
+        let left = CGPoint(x: inset.minX, y: inset.minY + inset.height * 0.28)
+        let bottom = CGPoint(x: inset.midX, y: inset.maxY)
+        let right = CGPoint(x: inset.maxX, y: inset.minY + inset.height * 0.28)
+        shield.move(to: top)
+        shield.addQuadCurve(to: left, control: CGPoint(x: inset.minX, y: inset.minY))
+        shield.addQuadCurve(to: bottom, control: CGPoint(x: inset.minX, y: inset.maxY - inset.height * 0.1))
+        shield.addQuadCurve(to: right, control: CGPoint(x: inset.maxX, y: inset.maxY - inset.height * 0.1))
+        shield.addQuadCurve(to: top, control: CGPoint(x: inset.maxX, y: inset.minY))
+        shield.closeSubpath()
+
+        context.fill(shield, with: .color(fill))
+        context.stroke(shield, with: .color(rim), lineWidth: max(1.5, rect.width * 0.07))
+
+        // Cross
+        var cross = Path()
+        let cx = inset.midX
+        let cy = inset.midY
+        let arm = inset.width * 0.22
+        cross.move(to: CGPoint(x: cx - arm, y: cy))
+        cross.addLine(to: CGPoint(x: cx + arm, y: cy))
+        cross.move(to: CGPoint(x: cx, y: cy - arm))
+        cross.addLine(to: CGPoint(x: cx, y: cy + arm))
+        context.stroke(cross, with: .color(.white.opacity(0.9)), lineWidth: max(1.5, rect.width * 0.08))
+
+        // Boss
+        let boss = CGRect(x: cx - inset.width * 0.08, y: cy - inset.height * 0.08, width: inset.width * 0.16, height: inset.height * 0.16)
+        context.fill(Path(ellipseIn: boss), with: .color(.white.opacity(0.85)))
+    }
+
+    private static func drawBomb(in rect: CGRect, context: inout GraphicsContext) {
+        let body = Color(red: 0.18, green: 0.18, blue: 0.2)
+        let fuse = Color(red: 0.55, green: 0.35, blue: 0.15)
+        let spark = Color(red: 1.0, green: 0.75, blue: 0.2)
+
+        let ball = CGRect(
+            x: rect.minX + rect.width * 0.12,
+            y: rect.minY + rect.height * 0.28,
+            width: rect.width * 0.7,
+            height: rect.height * 0.62
+        )
+        context.fill(Path(ellipseIn: ball), with: .color(body))
+        context.stroke(Path(ellipseIn: ball), with: .color(.white.opacity(0.15)), lineWidth: 1)
+
+        var fusePath = Path()
+        fusePath.move(to: CGPoint(x: ball.midX + ball.width * 0.15, y: ball.minY + ball.height * 0.08))
+        fusePath.addQuadCurve(
+            to: CGPoint(x: rect.midX + rect.width * 0.22, y: rect.minY + rect.height * 0.12),
+            control: CGPoint(x: rect.maxX - rect.width * 0.08, y: rect.minY + rect.height * 0.35)
+        )
+        context.stroke(fusePath, with: .color(fuse), lineWidth: max(1.5, rect.width * 0.07))
+
+        let sparkRect = CGRect(
+            x: rect.midX + rect.width * 0.16,
+            y: rect.minY + rect.height * 0.04,
+            width: rect.width * 0.18,
+            height: rect.height * 0.18
+        )
+        context.fill(Path(ellipseIn: sparkRect), with: .color(spark))
+    }
+
+    private static func drawSword(in rect: CGRect, context: inout GraphicsContext) {
+        let blade = Color(red: 0.85, green: 0.88, blue: 0.95)
+        let guardColor = Color(red: 0.9, green: 0.75, blue: 0.25)
+        let grip = Color(red: 0.45, green: 0.25, blue: 0.12)
+
+        // Blade (diagonal top-left to bottom-right tip-up)
+        var bladePath = Path()
+        let tip = CGPoint(x: rect.midX + rect.width * 0.28, y: rect.minY + rect.height * 0.08)
+        let baseL = CGPoint(x: rect.midX - rect.width * 0.08, y: rect.midY + rect.height * 0.08)
+        let baseR = CGPoint(x: rect.midX + rect.width * 0.08, y: rect.midY + rect.height * 0.18)
+        bladePath.move(to: tip)
+        bladePath.addLine(to: baseL)
+        bladePath.addLine(to: baseR)
+        bladePath.closeSubpath()
+        context.fill(bladePath, with: .color(blade))
+        context.stroke(bladePath, with: .color(.white.opacity(0.5)), lineWidth: 1)
+
+        // Guard
+        var guardPath = Path()
+        guardPath.addRoundedRect(
+            in: CGRect(
+                x: rect.midX - rect.width * 0.28,
+                y: rect.midY + rect.height * 0.05,
+                width: rect.width * 0.42,
+                height: rect.height * 0.1
+            ),
+            cornerSize: CGSize(width: 2, height: 2)
+        )
+        context.fill(guardPath, with: .color(guardColor))
+
+        // Grip
+        var gripPath = Path()
+        gripPath.addRoundedRect(
+            in: CGRect(
+                x: rect.midX - rect.width * 0.07,
+                y: rect.midY + rect.height * 0.16,
+                width: rect.width * 0.12,
+                height: rect.height * 0.28
+            ),
+            cornerSize: CGSize(width: 2, height: 2)
+        )
+        context.fill(gripPath, with: .color(grip))
+
+        // Pommel
+        let pommel = CGRect(
+            x: rect.midX - rect.width * 0.08,
+            y: rect.maxY - rect.height * 0.18,
+            width: rect.width * 0.16,
+            height: rect.height * 0.12
+        )
+        context.fill(Path(ellipseIn: pommel), with: .color(guardColor))
+    }
+
+    private static func drawBoomerang(in rect: CGRect, context: inout GraphicsContext) {
+        let fill = Color(red: 0.85, green: 0.45, blue: 0.2)
+        let edge = Color(red: 0.55, green: 0.25, blue: 0.08)
+        let inset = rect.insetBy(dx: rect.width * 0.1, dy: rect.height * 0.12)
+
+        var outer = Path()
+        outer.move(to: CGPoint(x: inset.minX + inset.width * 0.15, y: inset.maxY - inset.height * 0.15))
+        outer.addQuadCurve(
+            to: CGPoint(x: inset.midX, y: inset.minY + inset.height * 0.15),
+            control: CGPoint(x: inset.minX, y: inset.minY + inset.height * 0.1)
+        )
+        outer.addQuadCurve(
+            to: CGPoint(x: inset.maxX - inset.width * 0.15, y: inset.maxY - inset.height * 0.15),
+            control: CGPoint(x: inset.maxX, y: inset.minY + inset.height * 0.1)
+        )
+        outer.addQuadCurve(
+            to: CGPoint(x: inset.midX, y: inset.midY + inset.height * 0.05),
+            control: CGPoint(x: inset.maxX - inset.width * 0.25, y: inset.midY + inset.height * 0.2)
+        )
+        outer.addQuadCurve(
+            to: CGPoint(x: inset.minX + inset.width * 0.15, y: inset.maxY - inset.height * 0.15),
+            control: CGPoint(x: inset.minX + inset.width * 0.25, y: inset.midY + inset.height * 0.2)
+        )
+        outer.closeSubpath()
+
+        context.fill(outer, with: .color(fill))
+        context.stroke(outer, with: .color(edge), lineWidth: max(1, rect.width * 0.05))
+    }
 }
