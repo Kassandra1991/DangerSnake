@@ -34,6 +34,7 @@ final class GameEngine {
     var appleWeapon: ItemType? { apple.heldItem }
     var fieldItems: [FieldItem] { items.items }
     var snakeBody: [GridPos] { snake.body }
+    var snakeDirection: GridPos { snake.direction }
     var applePosition: GridPos { apple.position }
 
     func startMatch() {

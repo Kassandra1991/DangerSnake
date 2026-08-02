@@ -6,11 +6,12 @@ struct BoardCanvas: View {
 
     private let boardDark = Color(red: 0.07, green: 0.12, blue: 0.09)
     private let boardLite = Color(red: 0.09, green: 0.16, blue: 0.11)
-    private let snakeColor = Color(red: 0.35, green: 0.85, blue: 0.45)
-    private let snakeHead = Color(red: 0.55, green: 1.0, blue: 0.6)
-    private let appleColor = Color(red: 0.95, green: 0.25, blue: 0.28)
-    private let appleArmed = Color(red: 1.0, green: 0.55, blue: 0.15)
-    private let appleShield = Color(red: 0.4, green: 0.75, blue: 1.0)
+    private let snakeBodyFill = Color(red: 0.28, green: 0.72, blue: 0.38)
+    private let snakeHeadFill = Color(red: 0.42, green: 0.88, blue: 0.48)
+    private let snakeTailFill = Color(red: 0.2, green: 0.55, blue: 0.28)
+    private let appleColor = Color(red: 0.9, green: 0.18, blue: 0.22)
+    private let appleArmed = Color(red: 0.95, green: 0.45, blue: 0.12)
+    private let appleShieldBody = Color(red: 0.75, green: 0.2, blue: 0.28)
 
     var body: some View {
         let _ = engine.renderTick
@@ -39,11 +40,45 @@ struct BoardCanvas: View {
                     context.fill(Path(roundedRect: rect, cornerRadius: 4), with: .color(color(for: item.type)))
                 }
 
-                for (i, part) in engine.snakeBody.enumerated() {
-                    let inset = i == 0 ? cell * 0.08 : cell * 0.14
+                let body = engine.snakeBody
+                for (i, part) in body.enumerated() {
+                    let isHead = i == 0
+                    let isTail = i == body.count - 1 && body.count > 1
+                    let inset: CGFloat = {
+                        if isHead { return cell * 0.06 }
+                        if isTail { return cell * 0.16 }
+                        let t = CGFloat(i) / CGFloat(max(1, body.count - 1))
+                        return cell * (0.12 + t * 0.06)
+                    }()
                     let rect = cellRect(x: part.x, y: part.y, cell: cell, originX: originX, originY: originY, rows: engine.grid.height)
                         .insetBy(dx: inset, dy: inset)
-                    context.fill(Path(roundedRect: rect, cornerRadius: 4), with: .color(i == 0 ? snakeHead : snakeColor))
+
+                    if isHead {
+                        EntityShapes.drawSnakeHead(
+                            in: rect,
+                            direction: engine.snakeDirection,
+                            fill: snakeHeadFill,
+                            context: &context
+                        )
+                    } else if isTail {
+                        let tipDir: GridPos = {
+                            if body.count >= 2 {
+                                let before = body[body.count - 2]
+                                return GridPos(x: part.x - before.x, y: part.y - before.y)
+                            }
+                            return GridPos(x: -engine.snakeDirection.x, y: -engine.snakeDirection.y)
+                        }()
+                        EntityShapes.drawSnakeTail(
+                            in: rect,
+                            towardTailFrom: tipDir,
+                            fill: snakeTailFill,
+                            context: &context
+                        )
+                    } else {
+                        let t = CGFloat(i) / CGFloat(max(1, body.count - 1))
+                        let fill = snakeBodyFill.opacity(1.0 - t * 0.25)
+                        EntityShapes.drawSnakeBody(in: rect, fill: fill, context: &context)
+                    }
                 }
 
                 let appleRect = cellRect(
@@ -53,13 +88,18 @@ struct BoardCanvas: View {
                     originX: originX,
                     originY: originY,
                     rows: engine.grid.height
-                ).insetBy(dx: cell * 0.18, dy: cell * 0.18)
+                ).insetBy(dx: cell * 0.12, dy: cell * 0.12)
                 let aColor: Color = {
-                    if engine.hasShield { return appleShield }
                     if engine.appleWeapon != nil { return appleArmed }
+                    if engine.hasShield { return appleShieldBody }
                     return appleColor
                 }()
-                context.fill(Path(ellipseIn: appleRect), with: .color(aColor))
+                EntityShapes.drawApple(
+                    in: appleRect,
+                    fill: aColor,
+                    context: &context,
+                    showShieldRing: engine.hasShield
+                )
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .contentShape(Rectangle())
