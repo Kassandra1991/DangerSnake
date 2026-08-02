@@ -18,6 +18,8 @@ final class GameEngine {
     private(set) var gameOverReason = ""
     private(set) var renderTick: UInt64 = 0
     private(set) var awaitingFirstInput = true
+    private(set) var snakeStunRemaining: TimeInterval = 0
+    private(set) var boomerangFlight: BoomerangFlight?
 
     private var tickTimer: TimeInterval = 0
     private var snakeTickTimer: TimeInterval = 0
@@ -38,6 +40,16 @@ final class GameEngine {
     var snakeBody: [GridPos] { snake.body }
     var snakeDirection: GridPos { snake.direction }
     var applePosition: GridPos { apple.position }
+    var isSnakeStunned: Bool { snakeStunRemaining > 0 }
+
+    /// Interpolated board position of a flying boomerang, if any.
+    var boomerangFlightDisplay: (x: Double, y: Double)? {
+        guard let flight = boomerangFlight else { return nil }
+        let t = flight.progress
+        let x = Double(flight.from.x) + (Double(flight.to.x) - Double(flight.from.x)) * t
+        let y = Double(flight.from.y) + (Double(flight.to.y) - Double(flight.from.y)) * t
+        return (x, y)
+    }
 
     func startMatch() {
         stopLoop()
@@ -52,6 +64,8 @@ final class GameEngine {
         tickTimer = 0
         snakeTickTimer = 0
         matchElapsed = 0
+        snakeStunRemaining = 0
+        boomerangFlight = nil
         isRunning = true
         isGameOver = false
         isVictory = false
@@ -101,11 +115,25 @@ final class GameEngine {
         if awaitingFirstInput { return }
 
         matchElapsed += dt
+        if snakeStunRemaining > 0 {
+            snakeStunRemaining = max(0, snakeStunRemaining - dt)
+            if snakeStunRemaining == 0 {
+                status = "Snake is moving again!"
+            }
+        }
+
         rebuildOccupied()
-        items.tickRealtime(dt: dt, grid: grid, occupied: occupied)
+        if items.tickRealtime(dt: dt, grid: grid, occupied: occupied) {
+            status = "Sword vanished!"
+        }
+
+        updateBoomerangFlight(dt: dt)
+        if isRunning {
+            tryStartBoomerangFlight()
+        }
 
         tickTimer += dt
-        while tickTimer >= config.tickInterval {
+        while isRunning, tickTimer >= config.tickInterval {
             tickTimer -= config.tickInterval
             stepAppleTick()
             if !isRunning { break }
@@ -117,6 +145,7 @@ final class GameEngine {
             snakeTickTimer -= snakeInterval
             stepSnakeTick()
             if !isRunning { break }
+            tryStartBoomerangFlight()
         }
 
         renderTick &+= 1
@@ -125,50 +154,30 @@ final class GameEngine {
     private func stepAppleTick() {
         rebuildOccupied()
 
-        // 1) Player apple moves.
-        let appleStep = apple.tickMove(grid: grid)
+        let blocked = Set(items.greenApples.map(\.position))
+        _ = apple.tickMove(grid: grid, blocked: blocked)
 
-        // 2) Apple picks up items.
-        if let picked = items.tryPickup(at: apple.position) {
-            if picked == .shield {
+        if let picked = items.tryPickupGear(at: apple.position) {
+            switch picked {
+            case .greenApple:
+                break
+            case .shield:
                 apple.pickup(picked)
                 status = "Shield online!"
-            } else {
+            case .bomb, .sword, .boomerang:
                 apple.pickup(picked)
                 status = "Armed: \(picked.displayName)!"
             }
         }
 
-        // 3) Armed apple combat (boomerang along last step, or contact).
-        if let held = apple.heldItem {
-            if held == .boomerang, appleStep.x != 0 || appleStep.y != 0 {
-                if let boom = combat.tryBoomerangHit(
-                    applePos: apple.position,
-                    direction: appleStep,
-                    snake: snake,
-                    grid: grid
-                ) {
-                    apple.addScore(10)
-                    status = Self.describePlayerHit(boom)
-                    apple.consumeHeldItem()
-                    if !snake.isAlive {
-                        endVictory("Boomerang finish!")
-                        return
-                    }
-                }
-            }
+        tryStartBoomerangFlight()
 
-            if snake.occupies(apple.position) {
-                resolvePlayerAttack()
-                if !snake.isAlive {
-                    endVictory("You took down the snake!")
-                    return
-                }
-            }
+        if let held = apple.heldItem, snake.occupies(apple.position) {
+            resolvePlayerAttack()
+            if !isRunning { return }
         }
 
-        // Contact if snake already sits on apple between snake ticks.
-        if snake.head == apple.position {
+        if snake.head == apple.position, snakeStunRemaining <= 0 {
             handleSnakeBite()
         }
     }
@@ -176,11 +185,36 @@ final class GameEngine {
     private func stepSnakeTick() {
         rebuildOccupied()
 
-        let chase = SnakeAI.chooseDirection(snake: snake, apple: apple.position, grid: grid)
+        if snakeStunRemaining > 0 {
+            return
+        }
+
+        let target: GridPos
+        if let sword = items.nearestSword(from: snake.head) {
+            target = sword.position
+        } else if let food = items.nearestGreenApple(from: snake.head) {
+            target = food.position
+        } else {
+            target = apple.position
+        }
+
+        let chase = SnakeAI.chooseDirection(snake: snake, target: target, grid: grid)
         snake.setDirection(chase)
         if !snake.tickMove(grid: grid) {
             endVictory("Snake crashed!")
             return
+        }
+
+        if let landed = items.tryPickup(at: snake.head) {
+            switch landed {
+            case .greenApple:
+                snake.queueGrow()
+                status = "Snake grew!"
+            case .sword:
+                status = "Snake secured the sword!"
+            default:
+                break
+            }
         }
 
         if snake.head == apple.position {
@@ -191,26 +225,44 @@ final class GameEngine {
     private func resolvePlayerAttack() {
         guard let weapon = apple.heldItem else { return }
         let outcome = combat.applyAppleAttack(snake: snake, weapon: weapon)
+        applyCombatOutcome(outcome, consumeWeapon: true)
+    }
+
+    private func applyCombatOutcome(_ outcome: AttackOutcome, consumeWeapon: Bool) {
+        if consumeWeapon {
+            apple.consumeHeldItem()
+        }
         apple.addScore(10)
         status = Self.describePlayerHit(outcome)
-        apple.consumeHeldItem()
+
+        switch outcome {
+        case .stun:
+            snakeStunRemaining = config.bombStunDuration
+            status = "Bomb! Snake stunned!"
+        case .kill:
+            endVictory("Sword finish!")
+        case .cutOne, .cutHalf:
+            if !snake.isAlive {
+                endVictory("You took down the snake!")
+            }
+        case .blockedByShield, .none:
+            break
+        }
     }
 
     private func handleSnakeBite() {
         if apple.hasShield {
             apple.consumeShield()
             status = "Shield blocked the bite!"
-            // Nudge apple away if possible.
             return
         }
 
         if let weapon = apple.heldItem {
-            // Last-second strike when colliding.
             let outcome = combat.applyAppleAttack(snake: snake, weapon: weapon)
-            apple.addScore(10)
-            apple.consumeHeldItem()
-            status = Self.describePlayerHit(outcome)
-            if !snake.isAlive {
+            applyCombatOutcome(outcome, consumeWeapon: true)
+            if outcome == .stun {
+                status = "Counter-bomb! Snake stunned!"
+            } else if !snake.isAlive && isRunning {
                 endVictory("Counter-attack!")
             }
             return
@@ -222,9 +274,44 @@ final class GameEngine {
     private static func describePlayerHit(_ outcome: AttackOutcome) -> String {
         switch outcome {
         case .cutOne: return "Hit! Snake lost a segment."
-        case .cutHalf: return "Bomb! Snake cut in half."
+        case .cutHalf: return "Boomerang slash!"
+        case .stun: return "Bomb! Snake stunned!"
         case .kill: return "Sword finish!"
         case .blockedByShield, .none: return "Strike landed."
+        }
+    }
+
+    private func nearestSnakeSegment(from pos: GridPos) -> GridPos? {
+        snake.body.min { a, b in
+            pos.manhattan(a) < pos.manhattan(b)
+        }
+    }
+
+    private func tryStartBoomerangFlight() {
+        guard isRunning, boomerangFlight == nil else { return }
+        guard apple.heldItem == .boomerang else { return }
+        guard let target = nearestSnakeSegment(from: apple.position) else { return }
+        guard apple.position.manhattan(target) <= config.boomerangTriggerRange else { return }
+
+        apple.consumeHeldItem()
+        boomerangFlight = BoomerangFlight(
+            from: apple.position,
+            to: target,
+            elapsed: 0,
+            duration: config.boomerangFlightDuration
+        )
+        status = "Boomerang away!"
+    }
+
+    private func updateBoomerangFlight(dt: TimeInterval) {
+        guard var flight = boomerangFlight else { return }
+        flight.elapsed += dt
+        if flight.elapsed >= flight.duration {
+            boomerangFlight = nil
+            let outcome = combat.applyAppleAttack(snake: snake, weapon: .boomerang)
+            applyCombatOutcome(outcome, consumeWeapon: false)
+        } else {
+            boomerangFlight = flight
         }
     }
 
@@ -288,5 +375,17 @@ private final class CADisplayLinkProxy: NSObject {
         let dt = link.timestamp - lastTimestamp
         lastTimestamp = link.timestamp
         handler(dt)
+    }
+}
+
+struct BoomerangFlight: Sendable {
+    var from: GridPos
+    var to: GridPos
+    var elapsed: TimeInterval
+    var duration: TimeInterval
+
+    var progress: Double {
+        guard duration > 0 else { return 1 }
+        return min(1, elapsed / duration)
     }
 }

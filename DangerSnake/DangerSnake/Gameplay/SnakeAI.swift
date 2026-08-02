@@ -1,9 +1,8 @@
 import Foundation
 
 enum SnakeAI {
-    /// Pick a chase step toward the apple without walking into the body when possible.
-    static func chooseDirection(snake: Snake, apple: GridPos, grid: GridModel) -> GridPos {
-        let target = apple
+    /// Pick a chase step toward `target` without walking into the body when possible.
+    static func chooseDirection(snake: Snake, target: GridPos, grid: GridModel) -> GridPos {
         var best = snake.direction
         var bestScore = Int.min
 
@@ -13,12 +12,10 @@ enum SnakeAI {
             let next = snake.head + dir
             guard grid.inBounds(next) else { continue }
 
-            // Prefer not stepping onto body (except vacating tail handled in tickMove).
             var score = -next.manhattan(target) * 10
             if snake.occupies(next), next != snake.body.last {
                 score -= 1000
             }
-            // Slight bias to keep momentum.
             if dir == snake.direction {
                 score += 1
             }

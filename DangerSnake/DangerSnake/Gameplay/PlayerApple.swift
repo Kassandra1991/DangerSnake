@@ -34,14 +34,15 @@ final class PlayerApple {
         score += amount
     }
 
-    /// Move one cell; stops at edges (no wall death).
+    /// Move one cell; stops at edges and blocked cells (no wall death).
     @discardableResult
-    func tickMove(grid: GridModel) -> GridPos {
+    func tickMove(grid: GridModel, blocked: Set<GridPos> = []) -> GridPos {
         lastStep = GridPos(x: 0, y: 0)
         guard pendingDir.x != 0 || pendingDir.y != 0 else { return lastStep }
 
         let next = position + pendingDir
         guard grid.inBounds(next) else { return lastStep }
+        guard !blocked.contains(next) else { return lastStep }
 
         position = next
         lastStep = pendingDir
@@ -49,13 +50,16 @@ final class PlayerApple {
     }
 
     func pickup(_ type: ItemType) {
-        if type == .shield {
+        switch type {
+        case .shield:
             grantShield()
             addScore(10)
-            return
+        case .greenApple:
+            addScore(5)
+        case .bomb, .sword, .boomerang:
+            heldItem = type
+            addScore(10)
         }
-        heldItem = type
-        addScore(10)
     }
 
     func consumeHeldItem() {

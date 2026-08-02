@@ -100,6 +100,18 @@ struct BoardCanvas: View {
                     context: &context,
                     showShieldRing: engine.hasShield
                 )
+
+                if let boom = engine.boomerangFlightDisplay {
+                    let boomRect = fractionalCellRect(
+                        x: boom.x,
+                        y: boom.y,
+                        cell: cell,
+                        originX: originX,
+                        originY: originY,
+                        rows: engine.grid.height
+                    ).insetBy(dx: cell * 0.18, dy: cell * 0.18)
+                    EntityShapes.drawItem(type: .boomerang, in: boomRect, context: &context)
+                }
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .contentShape(Rectangle())
@@ -109,6 +121,23 @@ struct BoardCanvas: View {
 
     private func cellRect(x: Int, y: Int, cell: CGFloat, originX: CGFloat, originY: CGFloat, rows: Int) -> CGRect {
         let flippedY = CGFloat(rows - 1 - y)
+        return CGRect(
+            x: originX + CGFloat(x) * cell,
+            y: originY + flippedY * cell,
+            width: cell,
+            height: cell
+        )
+    }
+
+    private func fractionalCellRect(
+        x: Double,
+        y: Double,
+        cell: CGFloat,
+        originX: CGFloat,
+        originY: CGFloat,
+        rows: Int
+    ) -> CGRect {
+        let flippedY = CGFloat(rows - 1) - CGFloat(y)
         return CGRect(
             x: originX + CGFloat(x) * cell,
             y: originY + flippedY * cell,

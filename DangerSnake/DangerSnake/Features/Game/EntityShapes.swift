@@ -249,6 +249,13 @@ enum EntityShapes {
         case .bomb: drawBomb(in: rect, context: &context)
         case .sword: drawSword(in: rect, context: &context)
         case .boomerang: drawBoomerang(in: rect, context: &context)
+        case .greenApple:
+            drawApple(
+                in: rect,
+                fill: Color(red: 0.35, green: 0.78, blue: 0.28),
+                context: &context,
+                showShieldRing: false
+            )
         }
     }
 
